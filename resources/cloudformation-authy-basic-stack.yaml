@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  Generator: "former2"
+Description: ""
+Resources:
+  IAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: "lambda-access"
+      AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Description: "Allows Lambda functions to call AWS services on your behalf."
+
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Description: ""
+      Environment:
+        Variables:
+          TWILIO_AUTHY_API_KEY: "authy-app-production-api-key"
+      FunctionName: "authy-create-user"
+      Handler: "index.lambda_handler"
+      Code:
+        ZipFile: >
+          import json
+          def lambda_handler(event, context):
+            return {
+              'statusCode': 200,
+              'body': json.dumps('Hello from AWS Lambda Python!')
+            }
+      MemorySize: 128
+      Role: !GetAtt IAMRole.Arn
+      Runtime: "python3.8"
+      Timeout: 3
+      TracingConfig:
+        Mode: "PassThrough"
+
+  LambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/POST/authy"
+
+  ApiGatewayRestApi:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: "authy-api"
+      ApiKeySourceType: "HEADER"
+      EndpointConfiguration:
+        Types:
+        - "REGIONAL"
+
+  ApiGatewayResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      PathPart: "authy"
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+  ApiGatewayMethod:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: "OPTIONS"
+      AuthorizationType: "NONE"
+      ApiKeyRequired: false
+      RequestParameters: {}
+      MethodResponses:
+      -
+        ResponseModels:
+          "application/json": !Ref ApiGatewayModel2
+        ResponseParameters:
+          "method.response.header.Access-Control-Allow-Headers": false
+          "method.response.header.Access-Control-Allow-Methods": false
+          "method.response.header.Access-Control-Allow-Origin": false
+        StatusCode: "200"
+      Integration:
+        CacheNamespace: !Ref ApiGatewayResource
+        IntegrationResponses:
+        -
+          ResponseParameters:
+            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+            "method.response.header.Access-Control-Allow-Methods": "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+            "method.response.header.Access-Control-Allow-Origin": "'*'"
+          ResponseTemplates: {}
+          StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        RequestTemplates:
+          "application/json": "{\"statusCode\": 200}"
+        TimeoutInMillis: 29000
+        Type: "MOCK"
+
+  ApiGatewayMethod2:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: "POST"
+      AuthorizationType: "NONE"
+      ApiKeyRequired: false
+      RequestParameters: {}
+      MethodResponses:
+      -
+        ResponseModels:
+          "application/json": !Ref ApiGatewayModel2
+        StatusCode: "200"
+      Integration:
+        CacheNamespace: !Ref ApiGatewayResource
+        ContentHandling: "CONVERT_TO_TEXT"
+        IntegrationHttpMethod: "POST"
+        IntegrationResponses:
+        -
+          ResponseTemplates: {}
+          StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        TimeoutInMillis: 29000
+        Type: "AWS"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunction}/invocations"
+
+  ApiGatewayModel:
+    Type: "AWS::ApiGateway::Model"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: "Error2"
+      Description: "This is a default error schema model (2)"
+      Schema: |
+          {
+            "$schema" : "http://json-schema.org/draft-04/schema#",
+            "title" : "Error Schema (2)",
+            "type" : "object",
+            "properties" : {
+              "message" : { "type" : "string" }
+            }
+          }
+      ContentType: "application/json"
+
+  ApiGatewayModel2:
+    Type: "AWS::ApiGateway::Model"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: "Empty2"
+      Description: "This is a default empty schema model (2)"
+      Schema: |
+          {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "title" : "Empty Schema (2)",
+            "type" : "object"
+          }
+      ContentType: "application/json"
+
