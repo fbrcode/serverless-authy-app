@@ -417,7 +417,7 @@ $ curl \
 
 To terminate all resources, go to AWS Console > CloudFormation and delete the stack or issue an AWS CLI command for that.
 
-# Summary & Next Steps
+## Summary & Next Steps
 
 This is a basic POC that works as a starting point for enhanced authentication for cloud based applications. It uses a serverless approach which follows best practices for modern applications.
 
